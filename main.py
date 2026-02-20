@@ -1,74 +1,41 @@
+import os
 from flask import Flask, request, jsonify
+from dotenv import load_dotenv
+import openai
+import google.generativeai as genai
+
+# Cargar configuración secreta
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = Flask(__name__)
 
-# ==========================
-# CONFIGURACIÓN BÁSICA
-# ==========================
+# --- LÓGICA DE IA ---
 
-ACCESS_TOKEN = "TU_ACCESS_TOKEN_AQUI"
-VERIFY_TOKEN = "ventas_ia_token"
+def analizar_con_gemini(texto):
+    """Gemini analiza los detalles técnicos"""
+    model = genai.GenerativeModel('gemini-pro')
+    res = model.generate_content(f"Resume este pedido: {texto}")
+    return res.text
 
-# ==========================
-# WEBHOOK VERIFICACIÓN META
-# ==========================
+def vender_con_openai(resumen):
+    """OpenAI redacta el mensaje de venta persuasivo"""
+    response = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": "Eres un vendedor experto."},
+                  {"role": "user", "content": f"Cierra esta venta: {resumen}"}]
+    )
+    return response.choices[0].message.content
 
-@app.route("/webhook", methods=["GET"])
-def verify():
-    token = request.args.get("hub.verify_token")
-    challenge = request.args.get("hub.challenge")
+# --- RUTAS ---
 
-    if token == VERIFY_TOKEN:
-        return challenge
-    return "Token incorrecto", 403
-
-
-# ==========================
-# RECEPCIÓN DE MENSAJES
-# ==========================
-
-@app.route("/webhook", methods=["POST"])
-def receive_message():
+@app.route('/webhook', methods=['POST'])
+def handle_message():
     data = request.get_json()
-
-    try:
-        message = data["entry"][0]["changes"][0]["value"]["messages"][0]
-        sender = message["from"]
-        text = message["text"]["body"]
-
-        print(f"Mensaje recibido de {sender}: {text}")
-
-        # RESPUESTA INTELIGENTE BÁSICA
-        reply = generar_respuesta(text)
-
-        return jsonify({"status": "ok"})
-    except:
-        return jsonify({"status": "no message"})
-
-
-# ==========================
-# IA BÁSICA DE VENTAS
-# ==========================
-
-def generar_respuesta(texto):
-    texto = texto.lower()
-
-    if "precio" in texto:
-        return "Claro, tenemos planes desde $389 pesos mensuales. ¿Deseas instalar en casa o negocio?"
-
-    elif "internet" in texto:
-        return "Manejamos fibra óptica con instalación rápida. ¿En qué colonia te encuentras?"
-
-    elif "promoción" in texto:
-        return "Tenemos promoción de instalación sin costo este mes."
-
-    else:
-        return "Hola 👋 Gracias por tu mensaje. ¿Buscas internet para casa o negocio?"
-
-
-# ==========================
-# INICIO SERVIDOR
-# ==========================
+    # Aquí iría la lógica para recibir mensajes de WhatsApp/Meta
+    return jsonify({"status": "recibido"}), 200
 
 if __name__ == "__main__":
-    app
+    app.run(port=5000)
+
