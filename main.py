@@ -1,41 +1,47 @@
 import os
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-import openai
 import google.generativeai as genai
 
-# Cargar configuración secreta
+# Cargar configuración desde el archivo .env
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_key = os.getenv("GEMINI_API_KEY")
+
+# Configurar Gemini
+genai.configure(api_key=gemini_key)
+model = genai.GenerativeModel('gemini-pro')
 
 app = Flask(__name__)
 
-# --- LÓGICA DE IA ---
+def asistente_ventas_gemini(mensaje_cliente):
+    """Gemini analiza y responde como un vendedor experto"""
+    prompt = f"""
+    Eres un asistente de ventas experto para una empresa. 
+    Tu objetivo es ser amable, persuasivo y ayudar al cliente con su pedido.
+    
+    Mensaje del cliente: {mensaje_cliente}
+    
+    Respuesta profesional y vendedora:
+    """
+    response = model.generate_content(prompt)
+    return response.text
 
-def analizar_con_gemini(texto):
-    """Gemini analiza los detalles técnicos"""
-    model = genai.GenerativeModel('gemini-pro')
-    res = model.generate_content(f"Resume este pedido: {texto}")
-    return res.text
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    mensaje = data.get("mensaje", "")
+    
+    if not mensaje:
+        return jsonify({"error": "No enviaste un mensaje"}), 400
+    
+    # Usamos solo Gemini por ahora
+    respuesta = asistente_ventas_gemini(mensaje)
+    
+    return jsonify({"respuesta": respuesta})
 
-def vender_con_openai(resumen):
-    """OpenAI redacta el mensaje de venta persuasivo"""
-    response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "system", "content": "Eres un vendedor experto."},
-                  {"role": "user", "content": f"Cierra esta venta: {resumen}"}]
-    )
-    return response.choices[0].message.content
-
-# --- RUTAS ---
-
-@app.route('/webhook', methods=['POST'])
-def handle_message():
-    data = request.get_json()
-    # Aquí iría la lógica para recibir mensajes de WhatsApp/Meta
-    return jsonify({"status": "recibido"}), 200
+@app.route('/', methods=['GET'])
+def index():
+    return "Servidor de Ventas-IA activo y usando Gemini."
 
 if __name__ == "__main__":
-    app.run(port=5000)
-
+    app.run(host='0.0.0.0', port=5000)
